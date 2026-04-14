@@ -11,7 +11,7 @@ With the inspiration of Andrej Karpathy's LLM wiki (https://gist.github.com/karp
 
 The idea is to have structured data available for local LLM models - I will also try to follo Luhmann's "Zettelkasten" method extended with RAG functionality for PDFs and so on.
 
-The TechStack is the following:
+## TechStack is the following:
 - Obsidian for storing notes and ideas in .md files
 - ChromaDB for Embeddings
 - Python RAG Pipeline to chunk and embed files and contents (later replaced through OpenWebUI)
@@ -19,4 +19,13 @@ The TechStack is the following:
 - (OpenWebUI running as Chat UI and providing some functionality)
 - Later: graphify & automated ingest pipeline for a LLM to automatically analyze repositories and chat history to create a powerful always updated and self-learning second Brain
 
-
+## Flow:
+Obsidian (Wissen)
+   ↓
+Python Indexer
+   ↓
+Chroma Vector DB
+   ↓
+Ollama LLM
+   ↓
+Chat (Open WebUI)
