@@ -7,7 +7,7 @@ Vision: have a Andrej Karpathy LLM Wiki
 
 # secondBrain
 
-With the inspiration of Andrej Karpathy's (LLM Wiki|https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), I am considering building a second brain type of setup for work and private use speratate in different obsidian vaults but sharing the same RAG pipeline.
+With the inspiration of Andrej Karpathy's LLM wiki (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), I am considering building a second brain type of setup for work and private use speratate in different obsidian vaults but sharing the same RAG pipeline.
 
 The idea is to have structured data available for local LLM models - I will also try to follo Luhmann's "Zettelkasten" method extended with RAG functionality for PDFs and so on.
 
