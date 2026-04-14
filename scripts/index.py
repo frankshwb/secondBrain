@@ -9,6 +9,14 @@ from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 import chromadb
 from tqdm import tqdm
+import hashlib
+
+
+# -------------------------
+# HASH FUNCTION for Duplicate-Safe Indexing with Idempotency Layer
+# -------------------------
+def make_id(text, source):
+    return hashlib.md5((text + source).encode()).hexdigest()
 
 
 # -------------------------
@@ -75,17 +83,33 @@ def load_markdown():
 # -------------------------
 # CHUNKING
 # -------------------------
-def chunk_text(text, chunk_size=400):
+def chunk_text(text, max_chars=1200, overlap=200):
 
-    words = text.split()
+    sentences = text.replace("\n", " ").split(". ")
 
     chunks = []
+    current_chunk = ""
 
-    for i in range(0, len(words), chunk_size):
+    for sentence in sentences:
 
-        chunk = " ".join(words[i:i + chunk_size])
+        sentence = sentence.strip()
 
-        chunks.append(chunk)
+        if not sentence:
+            continue
+
+        # wenn Chunk zu groß wird → speichern
+        if len(current_chunk) + len(sentence) > max_chars:
+
+            chunks.append(current_chunk.strip())
+
+            # overlap behalten (wichtiger Kontext)
+            current_chunk = current_chunk[-overlap:] + " " + sentence
+
+        else:
+            current_chunk += " " + sentence
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
 
     return chunks
 
@@ -124,11 +148,11 @@ def index_documents():
         embeddings = embed_model.encode(chunks)
 
         for i, chunk in enumerate(chunks):
-
+            
             collection.add(
                 documents=[chunk],
                 embeddings=[embeddings[i].tolist()],
-                ids=[f"{doc_name}_{i}"],
+                ids=[make_id(chunk, doc_name)],
                 metadatas=[{
                     "source": doc_name,
                     "chunk_id": i,

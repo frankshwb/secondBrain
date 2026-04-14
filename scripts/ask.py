@@ -1,68 +1,177 @@
 import os
 import sys
-
-# ermöglicht Import von config.py
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-import config
+import re
 import chromadb
-from sentence_transformers import SentenceTransformer
 import requests
+from sentence_transformers import SentenceTransformer, CrossEncoder
+
+# enable config import
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+import config
 
 
-# Embedding Modell 1x nur laden
+# -------------------------
+# LOAD MODELS ONCE (IMPORTANT)
+# -------------------------
 embed_model = SentenceTransformer(config.EMBEDDING_MODEL)
+reranker = CrossEncoder(config.RERANKING_MODEL)
 
+client = chromadb.PersistentClient(path=config.CHROMA_PATH)
+collection = client.get_collection("second_brain")
+
+
+# -------------------------
+# KEYWORD EXTRACTION (LIGHTWEIGHT)
+# -------------------------
+def extract_keywords(text):
+
+    words = re.findall(r"[A-Za-z0-9\-]{3,}", text.lower())
+
+    stopwords = {
+        "the", "and", "for", "with", "what", "does",
+        "have", "about", "this", "that", "you", "are",
+        "was", "from", "into", "can", "how"
+    }
+
+    keywords = [w for w in words if w not in stopwords]
+
+    return keywords[:10]
+
+
+# -------------------------
+# HYBRID RETRIEVAL MERGE
+# -------------------------
+def merge_results(vec_results, kw_results):
+
+    seen = set()
+    merged_docs = []
+    merged_meta = []
+
+    def add_results(results):
+
+        docs = results["documents"][0]
+        metas = results["metadatas"][0]
+
+        for doc, meta in zip(docs, metas):
+
+            source = meta.get("source", "unknown") if meta else "unknown"
+            key = source + doc[:50]
+
+            if key not in seen:
+                seen.add(key)
+                merged_docs.append(doc)
+                merged_meta.append(meta)
+
+    add_results(vec_results)
+    add_results(kw_results)
+
+    return merged_docs, merged_meta
+
+# -------------------------
+# RERANK FUNCTION
+# -------------------------
+def rerank(question, docs, metas, top_k=4):
+
+    pairs = [(question, doc) for doc in docs]
+
+    scores = reranker.predict(pairs)
+
+    ranked = sorted(
+        zip(docs, metas, scores),
+        key=lambda x: x[2],
+        reverse=True
+    )
+
+    top = ranked[:top_k]
+
+    reranked_docs = [t[0] for t in top]
+    reranked_meta = [t[1] for t in top]
+
+    return reranked_docs, reranked_meta
+
+
+# -------------------------
+# MAIN ASK FUNCTION
+# -------------------------
 def ask(question):
 
-    # Verbindung zu Chroma
-    client = chromadb.PersistentClient(path=config.CHROMA_PATH)
-
-    collection = client.get_collection("second_brain")
-
-    # Embedding der Frage erstellen
     query_embedding = embed_model.encode([question])[0]
 
-    # Retrieval
-    results = collection.query(
+    keywords = extract_keywords(question)
+    keyword_query = " ".join(keywords)
+
+    # VECTOR SEARCH
+    vector_results = collection.query(
         query_embeddings=[query_embedding.tolist()],
         n_results=3,
         include=["documents", "metadatas"]
     )
 
-    context_chunks = results["documents"][0]
-    metadatas = results["metadatas"][0]
+    # KEYWORD SEARCH
+    keyword_results = collection.query(
+        query_texts=[keyword_query],
+        n_results=3,
+        include=["documents", "metadatas"]
+    )
 
-    print("\n--- Retrieved Context (with sources) ---\n")
+    # MERGE
+    merged_docs, merged_meta = merge_results(vector_results, keyword_results)
+    
+    #RERANK
+    context_chunks, metadatas = rerank(question, merged_docs, merged_meta)
+
+    # -------------------------
+    # DEBUG OUTPUT
+    # -------------------------
+    print("\n--- Retrieved Context (Hybrid) ---\n")
+
+    sources = []
 
     for i, (chunk, meta) in enumerate(zip(context_chunks, metadatas)):
 
+        source = meta.get("source", "unknown") if meta else "unknown"
+        doc_type = meta.get("type", "unknown") if meta else "unknown"
+
+        sources.append(source)
+
         print(f"Chunk {i+1}")
-        print(f"Source: {meta['source']}")
-        print(f"Type: {meta['type']}")
+        print(f"Source: {source}")
+        print(f"Type: {doc_type}")
         print("\nText:")
         print(chunk[:400])
         print("\n--------------------------\n")
 
-    
+
+    # -------------------------
+    # PROMPT
+    # -------------------------
     context = "\n\n".join(context_chunks)
 
-    # Prompt bauen
     prompt = f"""
-You are an AI assistant using the user's private knowledge base.
+        You are an AI assistant using a private knowledge base.
 
-Use the following context to answer the question.
+        Use ONLY the provided context to answer.
 
-Context:
-{context}
+        If you are unsure, say so.
 
-Question:
-{question}
+        Context:
+        {context}
 
-Answer:
-"""
+        Question:
+        {question}
 
-    # Anfrage an Ollama
+        After your answer, list sources used.
+
+        Sources:
+        {sources}
+
+        Answer:
+        """
+
+
+    # -------------------------
+    # OLLAMA CALL
+    # -------------------------
     response = requests.post(
         "http://localhost:11434/api/generate",
         json={
@@ -75,13 +184,16 @@ Answer:
     return response.json()["response"]
 
 
+# -------------------------
+# CHAT LOOP
+# -------------------------
 def chat():
 
-    print("\nAI Knowledge Brain ready.")
+    print("\nAI Knowledge Brain ready (Hybrid RAG + Sources).\n")
 
     while True:
 
-        question = input("\nAsk: ")
+        question = input("Ask: ")
 
         if question.lower() in ["exit", "quit"]:
             break
