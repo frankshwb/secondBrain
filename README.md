@@ -21,11 +21,11 @@ The idea is to have structured data available for local LLM models - I will also
 
 ## Flow:
 ```mermaid
-flowchart LR
-    A[Obsidian Notes] --> B[Python Indexer]
-    B --> C[Chroma Vector Database]
-    C --> D[Ollama LLM]
-    D --> E["CLI Chat Interface"]
+flowchart TD
+    Obsidian --> PythonIndexer
+    PythonIndexer --> ChromaVectorDB
+    ChromaVectorDB --> OllamaLLM
+    OllamaLLM --> ChatCLI
 ```
 
 ## How to get started
