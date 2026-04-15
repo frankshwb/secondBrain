@@ -68,6 +68,7 @@ def load_markdown():
             if file.endswith(".md"):
 
                 path = os.path.join(root, file)
+                print("md file: ", path)
 
                 with open(path, "r", encoding="utf-8") as f:
 
