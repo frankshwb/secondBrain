@@ -20,12 +20,23 @@ The idea is to have structured data available for local LLM models - I will also
 - Later: graphify & automated ingest pipeline for a LLM to automatically analyze repositories and chat history to create a powerful always updated and self-learning second Brain
 
 ## Flow:
-Obsidian (Wissen)
-   ↓
-Python Indexer
-   ↓
-Chroma Vector DB
-   ↓
-Ollama LLM
-   ↓
-Chat (Open WebUI)
+```mermaid
+  flowchart TD
+      A[Obsidian (Wissen)]-->B[Python Indexer];
+      B --> C[Chroma Vector DB];
+      C --> D[Ollama LLM];
+      D --> E[Chat(CLI)]
+   
+```
+
+## How to get started
+
+Change .env.local to .env and fill the things to adapt.
+You will need to following Env variables:
+```
+VAULT_PATH=
+CHROMA_PATH=
+EMBEDDING_MODEL=
+RERANKING_MODEL=
+LLM_MODEL=
+````
