@@ -1,18 +1,20 @@
+from dotenv import load_dotenv
 import os
 
-# Pfad zu deinem Obsidian Vault
-VAULT_PATH = "/Users/frsc4/SecondBrain"
+# .env Datei laden
+load_dotenv()
 
+VAULT_PATH = os.getenv("VAULT_PATH")
 PDF_PATH = os.path.join(VAULT_PATH, "05_resources/pdf")
 
 # Chroma DB Speicher
-CHROMA_PATH = "./data/chroma_db"
+CHROMA_PATH = os.getenv("CHROMA_PATH")
 
 # Embedding Model
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 
 #Reranking Model
-RERANKING_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANKING_MODEL = os.getenv("RERANKING_MODEL")
 
 # Ollama Modell
-LLM_MODEL = "llama3"
+LLM_MODEL = os.getenv("LLM_MODEL")
