@@ -19,15 +19,22 @@ The idea is to have structured data available for local LLM models - I will also
 - (OpenWebUI running as Chat UI and providing some functionality)
 - Later: graphify & automated ingest pipeline for a LLM to automatically analyze repositories and chat history to create a powerful always updated and self-learning second Brain
 
-## Flow:
+## Architectural Flow:
 ```mermaid
-flowchart TD
+graph LR
     Obsidian --> PythonIndexer
     PythonIndexer --> ChromaVectorDB
     ChromaVectorDB --> OllamaLLM
     OllamaLLM --> ChatCLI
 ```
 
+## User Flow
+```mermaid
+graph LR
+    AddFile --> RunPythonIndexer
+    RunPythonIndexer --> StartChatScript
+    StartChatScript --> Chat
+```
 ## How to get started
 
 Change .env.local to .env and fill the things to adapt.
