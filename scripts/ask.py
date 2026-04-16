@@ -3,6 +3,7 @@ import sys
 import re
 import chromadb
 import requests
+import json
 from sentence_transformers import SentenceTransformer, CrossEncoder
 
 # enable config import
@@ -123,7 +124,7 @@ def ask(question):
     # -------------------------
     # DEBUG OUTPUT
     # -------------------------
-    print("\n--- Retrieved Context (Hybrid) ---\n")
+    print("\n--- Retrieved Context (Hybrid Search) ---\n")
 
     sources = []
 
@@ -138,7 +139,7 @@ def ask(question):
         print(f"Source: {source}")
         print(f"Type: {doc_type}")
         print("\nText:")
-        print(chunk[:400])
+        print(chunk[:200])
         print("\n--------------------------\n")
 
 
@@ -167,22 +168,38 @@ def ask(question):
 
         Answer:
         """
-
-
+    
     # -------------------------
     # OLLAMA CALL
     # -------------------------
+    print("\nAI: ", end="", flush=True)
+    
     response = requests.post(
         "http://localhost:11434/api/generate",
         json={
             "model": config.LLM_MODEL,
             "prompt": prompt,
-            "stream": False
-        }
+            "stream": True
+        },
+        stream=True
     )
+    full_response = ""
+    
+    for line in response.iter_lines():
 
-    return response.json()["response"]
+        if line:
+            data = json.loads(line)
 
+            token = data.get("response", "")
+
+            print(token, end="", flush=True)
+
+            full_response += token
+
+    print("\n")
+
+    return full_response
+    #return response.json()["response"]
 
 # -------------------------
 # CHAT LOOP
