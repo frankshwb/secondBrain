@@ -138,10 +138,9 @@ def ask(question):
         print(f"Chunk {i+1}")
         print(f"Source: {source}")
         print(f"Type: {doc_type}")
-        print("\nText:")
-        print(chunk[:200])
-        print("\n--------------------------\n")
-
+        # print("\nText:")
+        # print(chunk[:100])
+        # print("\n--------------------------\n")
 
     # -------------------------
     # PROMPT
@@ -189,7 +188,6 @@ def ask(question):
 
         if line:
             data = json.loads(line)
-
             token = data.get("response", "")
 
             print(token, end="", flush=True)
@@ -197,9 +195,7 @@ def ask(question):
             full_response += token
 
     print("\n")
-
     return full_response
-    #return response.json()["response"]
 
 # -------------------------
 # CHAT LOOP
