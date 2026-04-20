@@ -109,15 +109,20 @@ def ask(question):
     )
 
     # KEYWORD SEARCH
+    keyword_embedding = embed_model.encode(keyword_query)
     keyword_results = collection.query(
-        query_texts=[keyword_query],
+        query_embeddings=[keyword_embedding.tolist()],
         n_results=3,
         include=["documents", "metadatas"]
     )
 
     # MERGE
     merged_docs, merged_meta = merge_results(vector_results, keyword_results)
-    
+
+    if not merged_docs:
+        print("No relevant context found for your question.")
+        return ""
+
     #RERANK
     context_chunks, metadatas = rerank(question, merged_docs, merged_meta)
 
@@ -145,28 +150,35 @@ def ask(question):
     # -------------------------
     # PROMPT
     # -------------------------
-    context = "\n\n".join(context_chunks)
 
-    prompt = f"""
-        You are an AI assistant using a private knowledge base.
+    # Label each chunk with its source so the model can cite precisely.
+    numbered_context = "\n\n".join(
+        f"[{i+1}] ({meta.get('source', 'unknown') if meta else 'unknown'})\n{chunk}"
+        for i, (chunk, meta) in enumerate(zip(context_chunks, metadatas))
+    )
 
-        Use ONLY the provided context to answer.
+    # Deduplicated, human-readable source list.
+    unique_sources = list(dict.fromkeys(sources))
+    sources_formatted = "\n".join(f"- {s}" for s in unique_sources)
 
-        If you are unsure, say so.
+    prompt = f"""You are a precise assistant for a personal knowledge base built with the Zettelkasten method.
 
-        Context:
-        {context}
+INSTRUCTIONS:
+- Answer using ONLY the numbered context passages below.
+- If the context is insufficient, say "I don't have enough information in my notes to answer this."
+- Be concise and direct. Avoid unnecessary filler.
+- Where relevant, cite the passage number(s) you relied on, e.g. [1], [2].
 
-        Question:
-        {question}
+CONTEXT:
+{numbered_context}
 
-        After your answer, list sources used.
+QUESTION:
+{question}
 
-        Sources:
-        {sources}
+SOURCES AVAILABLE:
+{sources_formatted}
 
-        Answer:
-        """
+ANSWER:"""
     
     # -------------------------
     # OLLAMA CALL

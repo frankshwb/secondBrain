@@ -37,16 +37,16 @@ def load_pdfs():
             path = os.path.join(config.PDF_PATH, file)
             print("pdf file: ", path)
 
-            reader = PdfReader(path)
-
-            text = ""
-
-            for page in reader.pages:
-
-                extracted = page.extract_text()
-
-                if extracted:
-                    text += extracted
+            try:
+                reader = PdfReader(path)
+                text = ""
+                for page in reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted
+            except Exception as e:
+                print(f"Warning: Could not read PDF '{file}': {e}")
+                continue
 
             if text.strip():
                 docs.append((file, text))
@@ -70,13 +70,14 @@ def load_markdown():
                 path = os.path.join(root, file)
                 print("md file: ", path)
 
-                with open(path, "r", encoding="utf-8") as f:
-
-                    text = f.read()
-
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        text = f.read()
                     if text.strip():
-
                         docs.append((file, text))
+                except Exception as e:
+                    print(f"Warning: Could not read markdown '{file}': {e}")
+                    continue
 
     return docs
 
@@ -86,19 +87,24 @@ def load_markdown():
 # -------------------------
 def chunk_text(text, max_chars=1200, overlap=200):
 
-    sentences = text.replace("\n", " ").split(". ")
+    # Split on paragraph boundaries first, then sentence-split within each paragraph.
+    # This preserves list items, code blocks, and structured notes better than a
+    # flat sentence split on the entire document.
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+    sentences = []
+    for paragraph in paragraphs:
+        parts = paragraph.replace("\n", " ").split(". ")
+        for part in parts:
+            part = part.strip()
+            if part:
+                sentences.append(part)
 
     chunks = []
     current_chunk = ""
 
     for sentence in sentences:
 
-        sentence = sentence.strip()
-
-        if not sentence:
-            continue
-
-        # wenn Chunk zu groß wird → speichern
         if len(current_chunk) + len(sentence) > max_chars:
 
             chunks.append(current_chunk.strip())
@@ -109,7 +115,7 @@ def chunk_text(text, max_chars=1200, overlap=200):
         else:
             current_chunk += " " + sentence
 
-    if current_chunk:
+    if current_chunk.strip():
         chunks.append(current_chunk.strip())
 
     return chunks
@@ -149,8 +155,11 @@ def index_documents():
         embeddings = embed_model.encode(chunks)
 
         for i, chunk in enumerate(chunks):
-            
-            collection.add(
+
+            # upsert makes the overwrite-on-same-id behaviour explicit:
+            # re-indexing the same content updates the stored chunk in place
+            # rather than raising a DuplicateIDError.
+            collection.upsert(
                 documents=[chunk],
                 embeddings=[embeddings[i].tolist()],
                 ids=[make_id(chunk, doc_name)],
@@ -160,7 +169,7 @@ def index_documents():
                     "type": "pdf" if doc_name.endswith(".pdf") else "markdown",
                     "path": doc_name
                 }]
-)
+            )
 
     print("Indexing finished.")
 
