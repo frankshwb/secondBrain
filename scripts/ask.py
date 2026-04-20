@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+from pathlib import Path
 import chromadb
 import requests
 import json
@@ -37,6 +38,46 @@ def extract_keywords(text):
     keywords = [w for w in words if w not in stopwords]
 
     return keywords[:10]
+
+
+def load_wiki_context(question, max_items=2, max_chars=1400):
+    wiki_root = Path(config.WIKI_PATH)
+    candidate_dirs = [wiki_root / "sources", wiki_root / "pages"]
+
+    question_tokens = set(extract_keywords(question))
+    if not question_tokens:
+        question_tokens = set(re.findall(r"[A-Za-z0-9\-]{3,}", question.lower()))
+
+    scored = []
+
+    for directory in candidate_dirs:
+        if not directory.exists():
+            continue
+
+        for file_path in directory.glob("*.md"):
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+
+            if not content.strip():
+                continue
+
+            content_tokens = set(re.findall(r"[A-Za-z0-9\-]{3,}", content.lower()))
+            overlap = len(question_tokens.intersection(content_tokens))
+
+            if overlap == 0:
+                continue
+
+            rel_path = str(file_path.relative_to(wiki_root)).replace("\\", "/")
+            scored.append((overlap, rel_path, content[:max_chars]))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    top = scored[:max_items]
+
+    docs = [item[2] for item in top]
+    metas = [{"source": item[1], "type": "wiki"} for item in top]
+    return docs, metas
 
 
 # -------------------------
@@ -96,6 +137,8 @@ def rerank(question, docs, metas, top_k=4):
 # -------------------------
 def ask(question):
 
+    wiki_docs, wiki_meta = load_wiki_context(question, max_items=2)
+
     query_embedding = embed_model.encode([question])[0]
 
     keywords = extract_keywords(question)
@@ -109,7 +152,7 @@ def ask(question):
     )
 
     # KEYWORD SEARCH
-    keyword_embedding = embed_model.encode(keyword_query)
+    keyword_embedding = embed_model.encode(keyword_query if keyword_query else question)
     keyword_results = collection.query(
         query_embeddings=[keyword_embedding.tolist()],
         n_results=3,
@@ -119,17 +162,28 @@ def ask(question):
     # MERGE
     merged_docs, merged_meta = merge_results(vector_results, keyword_results)
 
-    if not merged_docs:
+    if not merged_docs and not wiki_docs:
         print("No relevant context found for your question.")
         return ""
 
-    #RERANK
-    context_chunks, metadatas = rerank(question, merged_docs, merged_meta)
+    context_chunks = []
+    metadatas = []
+
+    if merged_docs:
+        #RERANK
+        raw_context_chunks, raw_metadatas = rerank(question, merged_docs, merged_meta)
+
+        # Prefer wiki context first; fill remaining slots with raw context.
+        context_chunks = wiki_docs + raw_context_chunks[:max(0, 4 - len(wiki_docs))]
+        metadatas = wiki_meta + raw_metadatas[:max(0, 4 - len(wiki_meta))]
+    else:
+        context_chunks = wiki_docs
+        metadatas = wiki_meta
 
     # -------------------------
     # DEBUG OUTPUT
     # -------------------------
-    print("\n--- Retrieved Context (Hybrid Search) ---\n")
+    print("\n--- Retrieved Context (Wiki + Hybrid Search) ---\n")
 
     sources = []
 
