@@ -167,7 +167,7 @@ INSTRUCTIONS:
 - Answer using ONLY the numbered context passages below.
 - If the context is insufficient, say "I don't have enough information in my notes to answer this."
 - Be concise and direct. Avoid unnecessary filler.
-- Where relevant, cite the passage number(s) you relied on, e.g. [1], [2].
+- Always cite the source file and passage number when you use context, e.g. [1 - source.md], [2 - other-file.md].
 
 CONTEXT:
 {numbered_context}
@@ -225,8 +225,8 @@ def chat():
 
         answer = ask(question)
 
-        print("\nAnswer:\n")
-        print(answer)
+        #print("\nAnswer:\n")
+        #print(answer)
 
 
 if __name__ == "__main__":
