@@ -37,6 +37,10 @@ graph LR
 ```
 ## How to get started
 
+First some prerequisites:
+- python3 installed
+- venv installed
+
 Change .env.local to .env and fill the things to adapt.
 You will need to following Env variables:
 ```
@@ -46,3 +50,16 @@ EMBEDDING_MODEL=
 RERANKING_MODEL=
 LLM_MODEL=
 ````
+
+### Start the tool (while LLM running locally):
+```
+1. source venv/bin/activate (to activate venv)
+
+2. pip install -r requirements.txt (to install requirements in the venv)
+
+3. python3 scripts/index.py (to run the indexer, on first run it could take longer)
+
+4. python3 scripts/ask.py (to start the main chat functionality in the CLI)
+````
+
+
